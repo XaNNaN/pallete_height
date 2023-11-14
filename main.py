@@ -26,6 +26,7 @@ class Box:
         self.packs_in_row = packs_in_row
         self.volume = self.parallelepiped_volume(length, width, height)
         self.pack_type = pack_type
+        self.virtual_height = height
 
     @staticmethod
     def rectangle_area(length: float, width: float) -> float:
@@ -203,20 +204,41 @@ class Pallet:
             for bin in packer:
                 packer_rect_sum += len(bin)
 
-        if area_last / self.area < 0.70 and len(packer[0]) != self.total_boxes:
+        area_last = 0
+        for rect in packer[-1]:
+            area_last += rect.width * rect.height
+
+        density_list = []
+        for bin in packer:
+            area = 0
+            for rect in bin:
+                area += rect.width * rect.height
+            density_list.append(area / self.area)
+        print(f"Density: {density_list}, boxes: {groups[0]}")
+
+        if area_last / self.area < 0.60 and len(packer[0]) != self.total_boxes:
             line_height = (len(packer) - 1) * groups[0][0].height
             idxs = []
+            packs = [pack for i, pack in enumerate(packer) if i != len(packer) - 1]
+            for pack in packs:
+                for rect in pack:
+                    idx = rect.rid
+                    self.box_counter[idx] -= 1
             for rect in packer[-1]:
                 idx = rect.rid
                 idxs.append(idx)
-                self.box_counter[idx] -= 1
             for idx in set(idxs):
                 heights = set([i.height for i in self.boxes if i.height != self.boxes[idx].height])
                 if heights == set():
                     line_height = groups[0][0].height
                 else:
                     nearest_height = nearest_value(heights, self.boxes[idx].height)
-                    self.boxes[idx].height = nearest_height
+                    if nearest_height > self.boxes[idx].height:
+                        self.boxes[idx].height = nearest_height
+                    else:
+                        heights_ = [i.height for i in self.boxes]
+                        i = heights_.index(nearest_height)
+                        self.boxes[i].height = self.boxes[idx].height
         else:
             line_height = len(packer) * groups[0][0].height
             for i in packs_idx:
@@ -238,7 +260,8 @@ ic(invoices_id[:5])
 column_invoice_id = []
 column_pallet_no = []
 column_pallet_height = []
-for invoice_id in invoices_id:
+# [True if i == 291072 else False for i in invoices_id]
+for invoice_id in invoices_id[[True if i == 291072 else False for i in invoices_id]]:
     ic(invoice_id)
     pallets = invoices_df[invoices_df['INVOICE_ID'] == invoice_id]["PALLET_NO"].unique()
     for pallet in pallets:

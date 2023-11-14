@@ -226,7 +226,7 @@ class Pallet:
             area = 0
 
         packer_0_len = len(packer[0])
-        if area_last / self.area < 0.80 and len(packer[0]) != self.total_boxes:
+        if area_last / self.area < 0.60 and len(packer[0]) != self.total_boxes:
             # print(f"Last line area is small, density: {area / self.area}")
             line_height = (len(packer) - 1) * groups[0][0].height
             idxs = []
@@ -335,7 +335,7 @@ output["INVOICE_ID"] = column_invoice_id
 output["PALLET_NO"] = column_pallet_no
 output["PALLET_HEIGHT"] = column_pallet_height
 ic(output.head())
-output.to_excel("output_4.xlsx")
+output.to_excel("output_low_density.xlsx")
 # boxes = []
 # box_count = []
 # for i in pallet_ids:

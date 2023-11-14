@@ -203,7 +203,7 @@ class Pallet:
             for bin in packer:
                 packer_rect_sum += len(bin)
 
-        if area_last / self.area < 0.70 and len(packer[0]) != self.total_boxes:
+        if area_last / self.area < 0.85 and len(packer[0]) != self.total_boxes:
             line_height = (len(packer) - 1) * groups[0][0].height
             idxs = []
             for rect in packer[-1]:
@@ -261,4 +261,4 @@ output["INVOICE_ID"] = column_invoice_id
 output["PALLET_NO"] = column_pallet_no
 output["PALLET_HEIGHT"] = column_pallet_height
 ic(output.head())
-output.to_excel("output_low_density_straight_sort.xlsx")
+output.to_excel("output_high_density_straight_sort.xlsx")

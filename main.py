@@ -10,6 +10,7 @@ from itertools import groupby
 
 # Отладка принтами на максималке
 from icecream import ic
+ic.disable()
 
 # Параметры самого поддона
 HEIGHT = 150
@@ -244,11 +245,7 @@ class Pallet:
                     line_height = groups[0][0].height
                 else:
                     nearest_height = nearest_value(heights, self.boxes[idx].height)
-                    if nearest_height < self.boxes[idx].height:
-                        nearest_height_idx = [_.height for _ in self.boxes].index(nearest_height)
-                        self.boxes[nearest_height_idx].height = self.boxes[idx].height
-                    else:
-                        self.boxes[idx].height = nearest_height
+                    self.boxes[idx].height = nearest_height
         else:
             line_height = len(packer) * groups[0][0].height
             for i in packs_idx:
@@ -335,7 +332,7 @@ output["INVOICE_ID"] = column_invoice_id
 output["PALLET_NO"] = column_pallet_no
 output["PALLET_HEIGHT"] = column_pallet_height
 ic(output.head())
-output.to_excel("output_low_density.xlsx")
+output.to_excel("output_low_density_straight_sort.xlsx")
 # boxes = []
 # box_count = []
 # for i in pallet_ids:

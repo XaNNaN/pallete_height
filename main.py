@@ -227,7 +227,7 @@ class Pallet:
             area = 0
 
         packer_0_len = len(packer[0])
-        if area_last / self.area < 0.60 and len(packer[0]) != self.total_boxes:
+        if area_last / self.area < 0.70 and len(packer[0]) != self.total_boxes:
             # print(f"Last line area is small, density: {area / self.area}")
             line_height = (len(packer) - 1) * groups[0][0].height
             idxs = []

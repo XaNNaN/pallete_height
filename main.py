@@ -55,12 +55,12 @@ class Pallet:
         self.length = length
         self.width = width
         self.area = self.rectangle_area(length, width)
-        self.boxes = sorted(boxes, key=self.sort_by_height)
+        boxes_index = [(i, item) for i, item in enumerate(boxes)]
+        sorted_box_index = sorted(boxes_index, key=self.sort_by_height)
+        self.boxes = [i[1] for i in sorted_box_index]
+        _ = [i[0] for i in sorted_box_index]
         self.lines = []
         self.total_height = HEIGHT
-        _ = []
-        for idx, item in enumerate(pack_counter):
-            _.append(self.boxes.index(boxes[idx]))
         self.box_counter = [pack_counter[i] for i in _]
         self.total_boxes = sum(pack_counter)
 
@@ -69,8 +69,8 @@ class Pallet:
         return length * width
 
     @staticmethod
-    def sort_by_height(box: list) -> float:
-        return box.height
+    def sort_by_height(box: tuple) -> float:
+        return box[1].height
 
     def __repr__(self):
         return f'Pallet\n' \

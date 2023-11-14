@@ -10,7 +10,6 @@ from itertools import groupby
 
 # Отладка принтами на максималке
 from icecream import ic
-ic.disable()
 
 # Параметры самого поддона
 HEIGHT = 150
@@ -59,7 +58,10 @@ class Pallet:
         self.boxes = sorted(boxes, key=self.sort_by_height)
         self.lines = []
         self.total_height = HEIGHT
-        self.box_counter = pack_counter
+        _ = []
+        for idx, item in enumerate(pack_counter):
+            _.append(self.boxes.index(boxes[idx]))
+        self.box_counter = [pack_counter[i] for i in _]
         self.total_boxes = sum(pack_counter)
 
     @staticmethod
@@ -158,7 +160,6 @@ class Pallet:
         # Add the rectangles to packing queue
         for r, box_index in zip(rectangles, soup_list):
             packer.add_rect(*r, rid=box_index)
-            # packer.add_rect(*r)
 
         # Add the bins where the rectangles will be placed
         for b in bin:
@@ -176,15 +177,11 @@ class Pallet:
                 area += rect.width * rect.height
                 counter += 1
             lines_density.append(area / self.area)
-            # print(f"Density: {area / self.area}")
-            # print(f"Rectcount in line: {counter}")
             area = 0
 
         area_last = 0
-        # Считаем площадь занимаюмаю всеми прямоугольниками в последнем бине.
         for rect in packer[-1]:
             area_last += rect.width * rect.height
-        # Если последний слой заполнен недостаточно плотно, то прямоугольники в нём должны быть добавлены в другю группу
 
         packer_rect_sum = 0
         for bin in packer:
@@ -195,47 +192,21 @@ class Pallet:
             # Увеличение количества слоёв на один
             n_bins += 1
             bin = [(self.length, self.width) for _ in range(n_bins)]
-
             packer = newPacker(bin_algo=bin_algo, pack_algo=pack_algo, rotation=True)
 
-            # Add the rectangles to packing queue
             for r, box_index in zip(rectangles, soup_list):
                 packer.add_rect(*r, rid=box_index)
-                # packer.add_rect(*r)
-
-            # Add the bins where the rectangles will be placed
             for b in bin:
                 packer.add_bin(*b)
-
-            # Start packing
             packer.pack()
 
             for bin in packer:
                 packer_rect_sum += len(bin)
 
-        # После размещения посмотрим на "плотность" каждого слоя.
-        area = 0
-        lines_density = []
-        for line in packer:
-            counter = 0
-            for rect in line:
-                area += rect.width * rect.height
-                counter += 1
-            lines_density.append(area / self.area)
-            # print(f"Density: {area / self.area}")
-            # print(f"Rectcount in line: {counter}")
-            area = 0
-
-        packer_0_len = len(packer[0])
         if area_last / self.area < 0.70 and len(packer[0]) != self.total_boxes:
-            # print(f"Last line area is small, density: {area / self.area}")
             line_height = (len(packer) - 1) * groups[0][0].height
             idxs = []
             for rect in packer[-1]:
-                # if (rect.height, rect.width) in soup_dict.keys():
-                #     idx = soup_dict[(rect.height, rect.width)]
-                # else:
-                #     idx = soup_dict[(rect.width, rect.height)]
                 idx = rect.rid
                 idxs.append(idx)
                 self.box_counter[idx] -= 1
@@ -256,49 +227,7 @@ class Pallet:
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
-# ic.disable()
-
-# # Чтение чтение таблицы.
-# box_types_df = pd.read_excel('package_types.xls', index_col=0)
-# # Дроп столбцов 'ROWS_NUMBER', 'ICOMMENT'.
-# box_types_df = box_types_df[['PACK_TYPE', 'LENGTH', 'WIDTH', 'HEIGHT', 'PACKS_IN_ROW']]
-# # Удаление строк с отсутствующими данными.
-# box_types_df = box_types_df.dropna()
-#
-# # Создание и заполнение уже словаря типов коробок по датафрейму.
-# # box_types_dict = {}
-# # for index, row in box_types_df.iterrows():
-# #     box_types_dict[row[0]] = [row[1], row[2], row[3], row[4]]
-#
-#
-# # Чтение файла поставки:
-# # +-------------+---------+
-# # | Column Name | Type    |
-# # +-------------+---------+
-# # | PALLET_ID   | int     | ID паллеты для этих коробок
-# # | PACK_ID     | varchar | ID упаковки из таблицы с упаковками
-# # | PACK_NUM    | varchar | Количество упаковок с данным ID на паллете
-# # +-------------+---------+
-# delivery_df = pd.read_excel('delivery.xls', index_col=0)
-# # Проверка нахождения упаковок поставки в словаре
-# del_index = []
-# # Индексы сохранились после удаления строк, поскольку не было reset_index()
-# pack_ids = frozenset(box_types_df.index.values)
-# for index, row in delivery_df.iterrows():
-#     if row[1] not in pack_ids:
-#         print(f'Упаковка с индексом {row[1]} отсутсвует в таблице либо данные о ней недостаточны.')
-#         print(f'Попробуйте задать PACKS_IN_ROW, равным очень большому числу, например 10 000.')
-#         del_index.append(index)
-# delivery_df.drop(del_index)
-# delivery_df = delivery_df.sort_values(by=['PALLET_ID'])
-#
-#
-# # INNER JOIN
-# new_df = delivery_df.merge(box_types_df, left_on='PACK_ID', right_index=True)
-# print(new_df)
-#
-# pallet_ids = new_df["PALLET_ID"].unique()
-# print(pallet_ids)
+ic.disable()
 
 invoices_df = pd.read_excel("ready_data.xlsx", index_col=0)
 
@@ -333,12 +262,3 @@ output["PALLET_NO"] = column_pallet_no
 output["PALLET_HEIGHT"] = column_pallet_height
 ic(output.head())
 output.to_excel("output_low_density_straight_sort.xlsx")
-# boxes = []
-# box_count = []
-# for i in pallet_ids:
-#     pallet_ = new_df[new_df['PALLET_ID'] == i]
-#     for index, box in pallet_.iterrows():
-#         boxes.append(Box(box[4], box[5], box[6], box[7], pack_type=box[3]))
-#         box_count.append(box[2])
-#     pallet_obj = Pallet(LENGTH, WIDTH, boxes, box_count)
-#     pallet_obj.build_pallet()

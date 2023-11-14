@@ -26,7 +26,7 @@ class Box:
         self.packs_in_row = packs_in_row
         self.volume = self.parallelepiped_volume(length, width, height)
         self.pack_type = pack_type
-        self.virtual_height = height
+        self.height_stable = height
 
     @staticmethod
     def rectangle_area(length: float, width: float) -> float:
@@ -125,6 +125,11 @@ class Pallet:
             groups.append(list(g))
             unique_keys.append(k)
 
+        stable_heights = [box.height_stable for box in groups[0]]
+        max_height = max(stable_heights)
+        for box in groups[0]:
+            box.height = max_height
+
         # Теперь создадим набор прямоугольников из первой группы.
         # Для нахождения объекта коробки(Box) и количества таких коробок на паллете будем хранить их общий индекс \
         # В словаре soup_dict.
@@ -216,10 +221,17 @@ class Pallet:
             density_list.append(area / self.area)
         print(f"Density: {density_list}, boxes: {groups[0]}")
 
-        if area_last / self.area < 0.60 and len(packer[0]) != self.total_boxes:
-            line_height = (len(packer) - 1) * groups[0][0].height
-            idxs = []
+        if area_last / self.area < 0.90 and len(packer[0]) != self.total_boxes:
             packs = [pack for i, pack in enumerate(packer) if i != len(packer) - 1]
+            line_height = 0
+            for bin in packs:
+                line_heights = []
+                for rect in bin:
+                    idx = rect.rid
+                    line_heights.append(self.boxes[idx].height_stable)
+                line_height += max(line_heights)
+            # line_height = (len(packer) - 1) * groups[0][0].height
+            idxs = []
             for pack in packs:
                 for rect in pack:
                     idx = rect.rid
@@ -228,7 +240,7 @@ class Pallet:
                 idx = rect.rid
                 idxs.append(idx)
             for idx in set(idxs):
-                heights = set([i.height for i in self.boxes if i.height != self.boxes[idx].height])
+                heights = set([i.height for i, c in zip(self.boxes, self.box_counter) if (i.height != self.boxes[idx].height and c > 0)])
                 if heights == set():
                     line_height = groups[0][0].height
                 else:
@@ -260,8 +272,8 @@ ic(invoices_id[:5])
 column_invoice_id = []
 column_pallet_no = []
 column_pallet_height = []
-# [True if i == 291072 else False for i in invoices_id]
-for invoice_id in invoices_id[[True if i == 291072 else False for i in invoices_id]]:
+# [True if i == 291062 or i == 291185 else False for i in invoices_id]
+for invoice_id in invoices_id[[True if i == 291097 else False for i in invoices_id]]:
     ic(invoice_id)
     pallets = invoices_df[invoices_df['INVOICE_ID'] == invoice_id]["PALLET_NO"].unique()
     for pallet in pallets:

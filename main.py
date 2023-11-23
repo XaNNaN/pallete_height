@@ -4,6 +4,7 @@ import pandas as pd
 # Библиотека для размещения прямоугольников
 from rectpack import *
 
+import copy
 
 # Для разделения коробок на группы по высоте
 from itertools import groupby
@@ -26,6 +27,7 @@ class Box:
         self.packs_in_row = packs_in_row
         self.volume = self.parallelepiped_volume(length, width, height)
         self.pack_type = pack_type
+        self.height_stable = height
 
     @staticmethod
     def rectangle_area(length: float, width: float) -> float:
@@ -36,7 +38,7 @@ class Box:
         return length * width * height
 
     def __repr__(self):
-        return f'  Pack_type:\t{self.pack_type}  {self.height}'
+        return f'  Pack_type:\t{self.pack_type}  {self.height}  {self.height_stable}'
     #     return f'\nBox\n' \
     #            f'  Pack type:\t{self.pack_type}\n' \
     #            f'  Length:\t{self.length}\n' \
@@ -51,26 +53,29 @@ class Box:
 
 
 class Pallet:
-    def __init__(self, length: float, width: float, boxes: list, pack_counter: list):
+    def __init__(self, length: float, width: float, boxes: list, pack_counter: list, reverse=False):
         self.length = length
         self.width = width
         self.area = self.rectangle_area(length, width)
-        self.boxes = sorted(boxes, key=self.sort_by_height)
+        boxes_index = [(i, item) for i, item in enumerate(boxes)]
+        sorted_box_index = sorted(boxes_index, key=self.sort_by_height, reverse=reverse)
+        self.boxes = [i[1] for i in sorted_box_index]
+        _ = [i[0] for i in sorted_box_index]
         self.lines = []
         self.total_height = HEIGHT
-        _ = []
-        for idx, item in enumerate(pack_counter):
-            _.append(self.boxes.index(boxes[idx]))
         self.box_counter = [pack_counter[i] for i in _]
         self.total_boxes = sum(pack_counter)
+        self.reverse = reverse
+        self.box_counter_ = pack_counter.copy()
+        self.boxes_ = copy.deepcopy(boxes)
 
     @staticmethod
     def rectangle_area(length: float, width: float) -> float:
         return length * width
 
     @staticmethod
-    def sort_by_height(box: list) -> float:
-        return box.height
+    def sort_by_height(box: tuple) -> float:
+        return box[1].height
 
     def __repr__(self):
         return f'Pallet\n' \
@@ -84,6 +89,14 @@ class Pallet:
         while self.total_boxes > 0:
             self._build_line()
         print(f"Pallet height: {self.total_height}")
+
+        if not self.reverse:
+            reverse_pallet = Pallet(self.length, self.width, self.boxes_, self.box_counter_, reverse=True)
+            reverse_pallet.build_pallet()
+            if self.total_height < reverse_pallet.total_height:
+                return self.total_height
+            else:
+                return reverse_pallet.total_height
 
         return self.total_height
 
@@ -123,6 +136,11 @@ class Pallet:
         for k, g in groupby(boxes, key=key_func):
             groups.append(list(g))
             unique_keys.append(k)
+
+        stable_heights = [box.height_stable for box in groups[0]]
+        max_height = max(stable_heights)
+        for box in groups[0]:
+            box.height = max_height
 
         # Теперь создадим набор прямоугольников из первой группы.
         # Для нахождения объекта коробки(Box) и количества таких коробок на паллете будем хранить их общий индекс \
@@ -203,25 +221,70 @@ class Pallet:
             for bin in packer:
                 packer_rect_sum += len(bin)
 
-        if area_last / self.area < 0.85 and len(packer[0]) != self.total_boxes:
-            line_height = (len(packer) - 1) * groups[0][0].height
+
+        area_last = 0
+        for rect in packer[-1]:
+            area_last += rect.width * rect.height
+
+        density_list = []
+        for bin in packer:
+            area = 0
+            for rect in bin:
+                area += rect.width * rect.height
+            density_list.append(area / self.area)
+        print(f"Density: {density_list}, boxes: {groups[0]}")
+
+        max_area = max([rect.width * rect.height for rect in packer[0]])
+        print([rect.width * rect.height for rect in packer[0]])
+        if max_area > 68000:
+            high_border = 0.65
+            print(f"{high_border}")
+        else:
+            high_border = 0.9
+
+        cond_1 = 0.18 < area_last / self.area < high_border and len(packer[0]) != self.total_boxes and self.reverse == False
+        cond_2 = area_last / self.area < high_border and len(packer[0]) != self.total_boxes and self.reverse == True
+
+        if cond_1 or cond_2:
+            packs = [pack for i, pack in enumerate(packer) if i != len(packer) - 1]
+            line_height = 0
+            for bin in packs:
+                line_heights = []
+                for rect in bin:
+                    idx = rect.rid
+                    line_heights.append(self.boxes[idx].height_stable)
+                line_height += max(line_heights)
+            # line_height = (len(packer) - 1) * groups[0][0].height
+            
             idxs = []
+            for pack in packs:
+                for rect in pack:
+                    idx = rect.rid
+                    self.box_counter[idx] -= 1
             for rect in packer[-1]:
                 idx = rect.rid
                 idxs.append(idx)
-                self.box_counter[idx] -= 1
             for idx in set(idxs):
-                heights = set([i.height for i in self.boxes if i.height != self.boxes[idx].height])
+                heights = set([i.height for i, c in zip(self.boxes, self.box_counter) if (i.height != self.boxes[idx].height and c > 0)])
                 if heights == set():
                     line_height = groups[0][0].height
                 else:
                     nearest_height = nearest_value(heights, self.boxes[idx].height)
-                    self.boxes[idx].height = nearest_height
+                    if nearest_height > self.boxes[idx].height:
+                        self.boxes[idx].height = nearest_height
+                    else:
+                        heights_ = [i.height for i in self.boxes]
+                        i = heights_.index(nearest_height)
+                        self.boxes[i].height = self.boxes[idx].height
         else:
-            line_height = len(packer) * groups[0][0].height
+            if area_last / self.area > 0.18 or len(packer[0]) == self.total_boxes:
+                line_height = len(packer) * groups[0][0].height
+            else:
+                line_height = (len(packer) - 1) * groups[0][0].height
             for i in packs_idx:
                 self.box_counter[i] = 0
 
+        print(line_height)
         return groups[0], line_height
 
 
@@ -229,7 +292,7 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 ic.disable()
 
-invoices_df = pd.read_excel("ready_data.xlsx", index_col=0)
+invoices_df = pd.read_excel("ready_fact_data_17_11.xlsx", index_col=0)
 
 output = pd.DataFrame(columns=["INVOICE_ID", "PALLET_NO", "PALLET_HEIGHT"])
 
@@ -238,6 +301,7 @@ ic(invoices_id[:5])
 column_invoice_id = []
 column_pallet_no = []
 column_pallet_height = []
+# [True if i == 291082 else False for i in invoices_id]
 for invoice_id in invoices_id:
     ic(invoice_id)
     pallets = invoices_df[invoices_df['INVOICE_ID'] == invoice_id]["PALLET_NO"].unique()
@@ -250,15 +314,18 @@ for invoice_id in invoices_id:
         boxes = []
         for index, box in boxes_df.iterrows():
             boxes.append(Box(box[3], box[4], box[5], box[6], pack_type=box[2]))
-            box_count.append(box[7])
+            box_count.append(box[8])
         ic(boxes)
         ic(box_count)
         pallet_object = Pallet(LENGTH, WIDTH, boxes, box_count)
-        pallet_object.build_pallet()
-        column_pallet_height.append(pallet_object.total_height)
+        height = pallet_object.build_pallet()
+        column_pallet_height.append(height)
 
 output["INVOICE_ID"] = column_invoice_id
 output["PALLET_NO"] = column_pallet_no
 output["PALLET_HEIGHT"] = column_pallet_height
+output = output.merge(invoices_df[["INVOICE_ID", "PALLET_NO", "PALLETE_HEIGHT_FACT"]], on=["INVOICE_ID", "PALLET_NO"])
+output["PALLETE_HEIGHT_FACT"] = output["PALLETE_HEIGHT_FACT"] * 10
+output = output.drop_duplicates()
 ic(output.head())
-output.to_excel("output_high_density_straight_sort.xlsx")
+output.to_excel("output_17_11.xlsx")

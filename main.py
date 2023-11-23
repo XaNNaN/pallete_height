@@ -4,6 +4,7 @@ import pandas as pd
 # Библиотека для размещения прямоугольников
 from rectpack import *
 
+import copy
 
 # Для разделения коробок на группы по высоте
 from itertools import groupby
@@ -37,7 +38,7 @@ class Box:
         return length * width * height
 
     def __repr__(self):
-        return f'  Pack_type:\t{self.pack_type}  {self.height}'
+        return f'  Pack_type:\t{self.pack_type}  {self.height}  {self.height_stable}'
     #     return f'\nBox\n' \
     #            f'  Pack type:\t{self.pack_type}\n' \
     #            f'  Length:\t{self.length}\n' \
@@ -52,18 +53,21 @@ class Box:
 
 
 class Pallet:
-    def __init__(self, length: float, width: float, boxes: list, pack_counter: list):
+    def __init__(self, length: float, width: float, boxes: list, pack_counter: list, reverse=False):
         self.length = length
         self.width = width
         self.area = self.rectangle_area(length, width)
         boxes_index = [(i, item) for i, item in enumerate(boxes)]
-        sorted_box_index = sorted(boxes_index, key=self.sort_by_height)
+        sorted_box_index = sorted(boxes_index, key=self.sort_by_height, reverse=reverse)
         self.boxes = [i[1] for i in sorted_box_index]
         _ = [i[0] for i in sorted_box_index]
         self.lines = []
         self.total_height = HEIGHT
         self.box_counter = [pack_counter[i] for i in _]
         self.total_boxes = sum(pack_counter)
+        self.reverse = reverse
+        self.box_counter_ = pack_counter.copy()
+        self.boxes_ = copy.deepcopy(boxes)
 
     @staticmethod
     def rectangle_area(length: float, width: float) -> float:
@@ -85,6 +89,14 @@ class Pallet:
         while self.total_boxes > 0:
             self._build_line()
         print(f"Pallet height: {self.total_height}")
+
+        if not self.reverse:
+            reverse_pallet = Pallet(self.length, self.width, self.boxes_, self.box_counter_, reverse=True)
+            reverse_pallet.build_pallet()
+            if self.total_height < reverse_pallet.total_height:
+                return self.total_height
+            else:
+                return reverse_pallet.total_height
 
         return self.total_height
 
@@ -221,7 +233,18 @@ class Pallet:
             density_list.append(area / self.area)
         print(f"Density: {density_list}, boxes: {groups[0]}")
 
-        if area_last / self.area < 0.90 and len(packer[0]) != self.total_boxes:
+        max_area = max([rect.width * rect.height for rect in packer[0]])
+        print([rect.width * rect.height for rect in packer[0]])
+        if max_area > 68000:
+            high_border = 0.65
+            print(f"{high_border}")
+        else:
+            high_border = 0.9
+
+        cond_1 = 0.18 < area_last / self.area < high_border and len(packer[0]) != self.total_boxes and self.reverse == False
+        cond_2 = area_last / self.area < high_border and len(packer[0]) != self.total_boxes and self.reverse == True
+
+        if cond_1 or cond_2:
             packs = [pack for i, pack in enumerate(packer) if i != len(packer) - 1]
             line_height = 0
             for bin in packs:
@@ -252,10 +275,14 @@ class Pallet:
                         i = heights_.index(nearest_height)
                         self.boxes[i].height = self.boxes[idx].height
         else:
-            line_height = len(packer) * groups[0][0].height
+            if area_last / self.area > 0.18 or len(packer[0]) == self.total_boxes:
+                line_height = len(packer) * groups[0][0].height
+            else:
+                line_height = (len(packer) - 1) * groups[0][0].height
             for i in packs_idx:
                 self.box_counter[i] = 0
 
+        print(line_height)
         return groups[0], line_height
 
 
@@ -263,7 +290,7 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 ic.disable()
 
-invoices_df = pd.read_excel("ready_data.xlsx", index_col=0)
+invoices_df = pd.read_excel("ready_fact_data_17_11.xlsx", index_col=0)
 
 output = pd.DataFrame(columns=["INVOICE_ID", "PALLET_NO", "PALLET_HEIGHT"])
 
@@ -272,8 +299,8 @@ ic(invoices_id[:5])
 column_invoice_id = []
 column_pallet_no = []
 column_pallet_height = []
-# [True if i == 291062 or i == 291185 else False for i in invoices_id]
-for invoice_id in invoices_id[[True if i == 291097 else False for i in invoices_id]]:
+# [True if i == 291082 else False for i in invoices_id]
+for invoice_id in invoices_id:
     ic(invoice_id)
     pallets = invoices_df[invoices_df['INVOICE_ID'] == invoice_id]["PALLET_NO"].unique()
     for pallet in pallets:
@@ -285,15 +312,18 @@ for invoice_id in invoices_id[[True if i == 291097 else False for i in invoices_
         boxes = []
         for index, box in boxes_df.iterrows():
             boxes.append(Box(box[3], box[4], box[5], box[6], pack_type=box[2]))
-            box_count.append(box[7])
+            box_count.append(box[8])
         ic(boxes)
         ic(box_count)
         pallet_object = Pallet(LENGTH, WIDTH, boxes, box_count)
-        pallet_object.build_pallet()
-        column_pallet_height.append(pallet_object.total_height)
+        height = pallet_object.build_pallet()
+        column_pallet_height.append(height)
 
 output["INVOICE_ID"] = column_invoice_id
 output["PALLET_NO"] = column_pallet_no
 output["PALLET_HEIGHT"] = column_pallet_height
+output = output.merge(invoices_df[["INVOICE_ID", "PALLET_NO", "PALLETE_HEIGHT_FACT"]], on=["INVOICE_ID", "PALLET_NO"])
+output["PALLETE_HEIGHT_FACT"] = output["PALLETE_HEIGHT_FACT"] * 10
+output = output.drop_duplicates()
 ic(output.head())
-output.to_excel("output_low_density_straight_sort.xlsx")
+output.to_excel("output_17_11.xlsx")

@@ -221,6 +221,7 @@ class Pallet:
             for bin in packer:
                 packer_rect_sum += len(bin)
 
+
         area_last = 0
         for rect in packer[-1]:
             area_last += rect.width * rect.height
@@ -254,6 +255,7 @@ class Pallet:
                     line_heights.append(self.boxes[idx].height_stable)
                 line_height += max(line_heights)
             # line_height = (len(packer) - 1) * groups[0][0].height
+            
             idxs = []
             for pack in packs:
                 for rect in pack:

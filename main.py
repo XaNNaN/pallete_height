@@ -292,7 +292,7 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 ic.disable()
 
-invoices_df = pd.read_excel("ready_fact_data_17_11.xlsx", index_col=0)
+invoices_df = pd.read_excel("ready_fact_data_28_11.xlsx", index_col=0)
 
 output = pd.DataFrame(columns=["INVOICE_ID", "PALLET_NO", "PALLET_HEIGHT"])
 
@@ -313,8 +313,8 @@ for invoice_id in invoices_id:
         box_count = []
         boxes = []
         for index, box in boxes_df.iterrows():
-            boxes.append(Box(box[3], box[4], box[5], box[6], pack_type=box[2]))
-            box_count.append(box[8])
+            boxes.append(Box(box[4], box[5], box[6], box[7], pack_type=box[2]))
+            box_count.append(box[9])
         ic(boxes)
         ic(box_count)
         pallet_object = Pallet(LENGTH, WIDTH, boxes, box_count)
@@ -328,4 +328,4 @@ output = output.merge(invoices_df[["INVOICE_ID", "PALLET_NO", "PALLETE_HEIGHT_FA
 output["PALLETE_HEIGHT_FACT"] = output["PALLETE_HEIGHT_FACT"] * 10
 output = output.drop_duplicates()
 ic(output.head())
-output.to_excel("output_17_11.xlsx")
+output.to_excel("output_28_11.xlsx")
